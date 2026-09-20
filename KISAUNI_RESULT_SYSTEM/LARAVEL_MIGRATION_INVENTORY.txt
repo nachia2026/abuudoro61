@@ -1,0 +1,258 @@
+KISAUNI RESULT SYSTEM - FLASK TO LARAVEL MIGRATION INVENTORY & PARITY CHECKLIST
+Generated from repository inspection at 2026-09-20.
+
+1) REPOSITORY INVENTORY
+
+Flask/Python application files discovered:
+- /home/runner/work/abuudoro61/abuudoro61/KISAUNI_RESULT_SYSTEM/app.py
+- /home/runner/work/abuudoro61/abuudoro61/KISAUNI_RESULT_SYSTEM/config.py
+- /home/runner/work/abuudoro61/abuudoro61/KISAUNI_RESULT_SYSTEM/database.py
+- /home/runner/work/abuudoro61/abuudoro61/KISAUNI_RESULT_SYSTEM/pdf_report.py
+- /home/runner/work/abuudoro61/abuudoro61/KISAUNI_RESULT_SYSTEM/requirements.txt
+- /home/runner/work/abuudoro61/abuudoro61/KISAUNI_RESULT_SYSTEM/templates/*.html
+- /home/runner/work/abuudoro61/abuudoro61/KISAUNI_RESULT_SYSTEM/static/css/style.css
+- /home/runner/work/abuudoro61/abuudoro61/KISAUNI_RESULT_SYSTEM/static/js/script.js
+- /home/runner/work/abuudoro61/abuudoro61/KISAUNI_RESULT_SYSTEM/static/images/logo.png
+
+Laravel/PHP files discovered:
+- None (no composer.json, no Laravel app structure, no PHP source files).
+
+2) DATABASE SCHEMA / TABLES / RELATIONSHIPS / WORKFLOW
+
+Source: database.py (SCHEMA + init migrations)
+
+Tables:
+- users(id, username, password_hash, full_name, role, class_id, active, must_change_password, photo_path, title, failed_login_attempts, locked_until, created_at)
+- classes(id, name, standard, stream, sort_order, teacher_id, last_promoted_year)
+- subjects(id, name)
+- class_subjects(class_id, subject_id) [composite PK]
+- students(id, reg_no, full_name, gender, gender_confirmed, class_id, active, leave_reason, created_at)
+- examinations(id, exam_type, academic_year, created_at)
+- marks(id, student_id, exam_id, subject_id, score, entered_by, updated_at, class_id)
+- exam_class_status(exam_id, class_id, status, remarks, submitted_by, submitted_at, approved_by, approved_at)
+- settings(key, value)
+- audit_log(id, user_id, username, action, details, created_at)
+
+Workflow state machine:
+- draft -> submitted -> under_review -> approved
+- returned path exists: returned -> corrected -> re-submit via submit action
+- locked editing statuses: submitted, under_review, approved
+
+Data integrity and safety behavior:
+- SQLite FK enabled + WAL + busy_timeout
+- Seeded defaults (classes, subjects, exams, headmaster, settings)
+- Safe additive schema migrations in code via ALTER TABLE try/except
+- Backups: startup + periodic + pre-restore + pre-promotion
+- Audit retention purge only affects audit_log
+
+3) ROUTES / ENDPOINTS DISCOVERED (app.py)
+
+Auth/account:
+- /, /login, /logout, /forgot-password, /change-password, /profile
+
+Dashboard/overview:
+- /dashboard
+- /headmaster/overview
+- /analytics
+
+Students/classes/subjects/exams/users:
+- /students, /students/add, /students/add-bulk, /students/edit/<id>, /students/delete/<id>, /students/restore/<id>, /students/purge/<id>
+- /classes, /classes/add, /classes/delete/<id>
+- /promote
+- /subjects, /subjects/delete/<id>
+- /examinations, /examinations/delete/<id>
+- /users, /users/add, /users/edit/<id>, /users/toggle/<id>, /users/delete/<id>
+
+Marks/results/reports/records:
+- /marks, /marks/<exam_id>/<class_id>, /marks/submit/<exam_id>/<class_id>
+- /results, /results/review/<exam_id>/<class_id>, /results/review/<exam_id>/<class_id>/download
+- /records
+- /reports
+- /students/<id>/history
+- /reports/student/<student_id>/<exam_id>
+- /reports/student/<student_id>/<exam_id>/download
+
+Settings/backups/audit/api/media:
+- /settings
+- /settings/backup/create
+- /settings/backup/download/<filename>
+- /settings/backup/restore/<filename>
+- /settings/backup/upload-restore
+- /settings/backup/delete/<filename>
+- /audit-logs
+- /api/detect-gender
+- /api/keep-alive
+- /api/students-by-class/<class_id>
+- /api/students-with-marks/<class_id>/<exam_id>
+- /media/<path>
+
+4) TEMPLATES / MACROS / ASSETS / UI STRUCTURE
+
+Templates found:
+- base.html, _macros.html
+- dashboard.html
+- students.html, student_form.html, student_form_bulk.html, student_history.html
+- classes.html, subjects.html, examinations.html
+- users.html, user_form.html, profile.html, change_password.html, forgot_password.html, login.html
+- marks_select.html, marks.html
+- results.html, review_results.html, records.html, analytics.html
+- reports.html, student_report.html, headmaster_overview.html
+- promote.html, promote_my_class.html
+- settings.html, audit_logs.html, error.html
+
+Macro/component equivalents required:
+- page_header macro in _macros.html -> Blade component/partial
+
+Primary menu groups from base.html:
+- Dashboard
+- Students (Students, Classes [headmaster], Promote Students, Subjects, Examinations)
+- Results (Marks Entry, Review & Approval [headmaster], Headmaster Overview [headmaster], Performance Analytics, Reports, Exam Records/Search)
+- Admin [headmaster] (Users/Accounts, Settings, Audit Log)
+- Account (Profile, Change Password, Logout)
+
+UI/UX features to preserve:
+- Sidebar/topbar layout
+- Toast flash notifications
+- Confirmation modal
+- Idle-timeout warning modal and auto-logout
+- Dark/light theme toggle
+- Mobile drawer sidebar behavior
+- Print styles and report layout styling
+
+5) FORMS / BUTTONS / JAVASCRIPT INTERACTIONS
+
+Major interactions from script.js/templates:
+- Gender auto-detect API call during student form entry
+- Live marks row total/average/grade calculation preview
+- Password show/hide toggles
+- Submit loading button states
+- Styled confirmation modal replacing native confirm
+- Auto-dismiss flash toasts
+- Idle timeout watcher + keep-alive ping + forced logout redirect
+- Theme toggle persisted in localStorage
+- Print action via window.print
+
+6) AUTHENTICATION / SESSION / SECURITY / PERMISSIONS
+
+Implemented source behavior to preserve:
+- Login/logout with role-based session data
+- Brute-force lockout (max attempts + temporary lock time)
+- Temporary password force-change gate via before_request
+- Active/inactive user enforcement
+- Class-teacher restriction checks on server-side (class-bound access)
+- Headmaster-only pages/actions
+- No-cache headers to prevent back-button access after logout
+- Session lifetime + refresh + browser-session cookie behavior
+
+7) VALIDATIONS / BUSINESS RULES / CALCULATIONS
+
+Preserve exactly from config.py/app.py:
+- Grade bands and threshold behavior (>= low, no gaps for decimals)
+- Remarks derived from grade + class position thirds
+- Class/subject mapping by standard bands
+- Mark score bounds and entered-subject handling in marks flow
+- Student result totals, averages, grade, positions (tie behavior)
+- Class analytics, school analytics, class ranking
+- Subject performance ranking (top/bottom subjects)
+- Promotion restrictions by academic year and class last_promoted_year
+
+8) REPORTS / PDF / PRINTING
+
+Current outputs to migrate:
+- Student report screen + print
+- Student report downloadable PDF (reportlab)
+- Class review result sheet + print
+- Class result downloadable PDF
+- Signature/stamp areas, school metadata, exam/year details, grades/positions/remarks
+
+9) AUDIT LOGGING / ERRORS / FLASH / REDIRECTS
+
+Current source behavior:
+- audit_log entries for security and workflow operations
+- status history reconstructed from audit log action/details matching
+- 404/500/catch-all error pages via error.html
+- category flash messaging (success/info/warning/danger)
+- redirects on permission denial, forced password change, unauthenticated access
+
+10) SEARCH / FILTERING / HISTORY
+
+Current source behavior:
+- Exam Records / Search page
+- Reports filtering by class/exam/student
+- Student history across examinations and historical class snapshot behavior via marks.class_id
+
+11) FLASK -> LARAVEL FEATURE MAPPING (CONCRETE TARGETS)
+
+Application foundation:
+- Flask app.py bootstrap -> Laravel AppServiceProvider + middleware + route groups
+- Flask context globals -> view composers / shared view data
+
+Database:
+- SQLite schema in database.py -> Laravel migrations (safe/additive only)
+- Row-based SQL reads/writes -> Eloquent models + query builder preserving SQL semantics
+
+Models (minimum set):
+- User, SchoolClass, Subject, ClassSubject, Student, Examination, Mark, ExamClassStatus, Setting, AuditLog
+
+Authorization:
+- role checks in routes -> middleware + policies/gates
+- class_teacher class-bound checks -> policy scope + controller guards
+
+Workflow:
+- exam_class_status transitions -> service layer + transactional updates + audit entries
+
+Views/UI:
+- Jinja templates -> Blade templates maintaining same menu/button/layout/CSS/JS behavior
+- _macros.page_header -> Blade component/partial
+- Existing style.css/script.js -> retained or ported with equivalent selectors/behavior
+
+Reports:
+- reportlab PDF generation -> Laravel PDF equivalent preserving data fields/layout semantics
+
+Backups/settings:
+- settings + backup create/download/restore/upload/delete routes -> Laravel controllers/services
+
+12) MISSING LARAVEL EQUIVALENTS (CURRENT GAP)
+
+Everything below is currently missing in repository:
+- Laravel application skeleton (bootstrap/app, config, app/, routes/, resources/views/, public/)
+- Laravel migrations/models/controllers/middleware/policies/services
+- Laravel auth/session implementation with current lockout + must-change-password behavior
+- Blade equivalents for all Flask templates/macros
+- Laravel routes matching all Flask endpoints/features
+- PDF/report implementation in Laravel
+- Laravel audit logging pipeline equivalent
+- Laravel tests
+
+13) FEATURE PARITY CHECKLIST (TO MARK COMPLETE DURING MIGRATION)
+
+- [ ] Login/logout/forgot/change password parity
+- [ ] Role enforcement parity (headmaster/class_teacher)
+- [ ] Class-bound authorization parity for class teachers
+- [ ] Dashboard parity (stats, recent activity, role-specific cards)
+- [ ] Students CRUD + bulk add + restore/purge parity
+- [ ] Classes/streams and teacher assignment parity
+- [ ] Subjects and class-subject mapping parity
+- [ ] Examinations CRUD parity
+- [ ] Users/accounts management parity
+- [ ] Marks entry parity (validation + live preview consistency)
+- [ ] Result submission/review/return/approval workflow parity
+- [ ] Result locking rules parity
+- [ ] Promotions workflow parity
+- [ ] Headmaster overview parity
+- [ ] Analytics parity (class/school/subject ranking)
+- [ ] Records/search/filtering parity
+- [ ] Reports parity (student/class views + print)
+- [ ] Downloadable PDF parity (student/class)
+- [ ] Settings parity (school name/year/logo)
+- [ ] Backup create/download/restore/upload/delete parity
+- [ ] Audit log and status history parity
+- [ ] Flash/error/redirect parity
+- [ ] Responsive UI and dark mode parity
+- [ ] No feature/menu/button regressions vs Flask source
+
+14) VALIDATION STATUS IN THIS REPOSITORY SNAPSHOT
+
+- Existing test infrastructure for this codebase: none detected.
+- Existing Laravel test/build tooling: none detected (Laravel not yet present).
+- GitHub Actions CI inspection performed: latest run checked; no failed jobs in current run.
