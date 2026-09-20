@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block page_title %}Review Results{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h5 class="mb-0">{{ cls.name }} — {{ exam.exam_type }} ({{ exam.academic_year }})</h5>
+        <span class="badge status-badge-{{ status_row.status if status_row else 'draft' }} mt-1">
+            {{ STATUS_LABELS.get(status_row.status if status_row else 'draft', 'Draft')|upper }}
+        </span>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('review_results_download', exam_id=exam.id, class_id=cls.id) }}" class="btn btn-sm btn-outline-primary no-print">
+            <i class="bi bi-file-earmark-pdf me-1"></i>Download PDF
+        </a>
+        <a href="{{ url_for('results') }}" class="btn btn-sm btn-outline-secondary no-print">&larr; Back</a>
+    </div>
+</div>
+
+{% if status_row and status_row.remarks and status_row.status == 'returned' %}
+<div class="alert alert-secondary no-print"><strong>Previous Remarks:</strong> {{ status_row.remarks }}</div>
+{% endif %}
+
+{# ---------------------------------------------------------------------
+   Printable Class Result Sheet - on screen this is just the same table
+   as before; when printed (e.g. Ctrl+P, or via a printed PDF)
+   it gets the official letterhead header, S/N column, class average, and
+   a signed/stamped footer, reusing the exact same design used on the
+   individual Student Report (kps-sheet / class-report-wrap classes) so
+   both printed documents look consistent.
+--------------------------------------------------------------------- #}
+<div class="kps-sheet class-report-wrap">
+
+    <div class="kps-header-top d-none d-print-flex">
+        <div class="logo-col"><img src="{{ logo_url(logo_path) }}" alt="logo"></div>
+        <div class="center-col">
+            <h1>{{ school_name|upper }}</h1>
+            <div class="subtitle">CLASS RESULT SHEET</div>
+            <span class="academic-badge">{{ exam.exam_type|upper }} - {{ exam.academic_year }}</span>
+        </div>
+    </div>
+
+    <div class="kps-info-wrap d-none d-print-flex">
+        <div class="kps-info-box">
+            <div class="kps-info-row"><span class="k">Class</span><span class="sep">:</span><span class="v">{{ cls.name }}</span></div>
+            <div class="kps-info-row"><span class="k">Students</span><span class="sep">:</span><span class="v">{{ results|length }}</span></div>
+            <div class="kps-info-row"><span class="k">Class Teacher</span><span class="sep">:</span><span class="v">{{ teacher.full_name if teacher else '-' }}</span></div>
+            <div class="kps-info-row"><span class="k">Class Average</span><span class="sep">:</span><span class="v">{{ class_average if class_average is not none else '-' }} ({{ class_grade }})</span></div>
+            <div class="kps-info-row"><span class="k">Class Position</span><span class="sep">:</span><span class="v">{{ class_position if class_position is not none else '-' }}</span></div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle mb-0 report-table">
+                <thead>
+                <tr>
+                    <th class="d-none d-print-table-cell text-center" style="width:36px;">S/N</th>
+                    <th>Reg No</th>
+                    <th>Name</th>
+                    {% for sub in subjects %}<th class="text-center">{{ sub.name }}</th>{% endfor %}
+                    <th class="text-center">Total</th>
+                    <th class="text-center">Average</th>
+                    <th class="text-center">Grade</th>
+                    <th class="text-center">Position</th>
+                    <th class="text-center">Remark</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for r in results %}
+                <tr>
+                    <td class="d-none d-print-table-cell text-center">{{ loop.index }}</td>
+                    <td>{{ r.student.reg_no }}</td>
+                    <td>{{ r.student.full_name }}</td>
+                    {% for sub in subjects %}
+                    <td class="text-center">{{ r.scores.get(sub.id, '-') }}</td>
+                    {% endfor %}
+                    <td class="text-center fw-semibold">{{ r.total if r.subjects_entered else '-' }}</td>
+                    <td class="text-center fw-semibold">{{ r.average if r.average is not none else '-' }}</td>
+                    <td class="text-center"><span class="grade-badge grade-{{ r.grade }}">{{ r.grade }}</span></td>
+                    <td class="text-center">{{ r.position }}</td>
+                    <td class="text-center">{{ r.remark }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="kps-footer d-none d-print-flex">
+        <div class="sign-col">
+            <div class="sign-line">CLASS TEACHER SIGN.{% if teacher %}<br><small>{{ teacher.full_name }}</small>{% endif %}</div>
+            <div class="sign-date">Date: {{ report_date }}</div>
+        </div>
+        <div class="stamp-col">
+            <div class="stamp-circle">{{ school_name|upper }}<br>OFFICIAL STAMP</div>
+        </div>
+        <div class="sign-col">
+            <div class="sign-line">HEAD MASTER SIGN.</div>
+            <div class="sign-date">Date: {{ report_date }}</div>
+        </div>
+    </div>
+</div>
+
+{% if status_row and status_row.status in ['submitted', 'under_review'] %}
+<div class="card p-3 no-print mb-3">
+    <div class="d-flex gap-2 flex-wrap">
+        <form method="POST" onsubmit="return appConfirm(this, 'Are you sure you want to approve these results? Once approved, they will be locked.', {okClass: 'btn-success', okText: 'Approve', icon: 'bi-check2-circle'});">
+            <input type="hidden" name="action" value="approve">
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-check2-circle me-1"></i>Approve Results
+            </button>
+        </form>
+        <button type="button" class="btn btn-outline-danger" onclick="document.getElementById('returnPanel').classList.toggle('d-none')">
+            <i class="bi bi-arrow-return-left me-1"></i>Return for Correction
+        </button>
+    </div>
+
+    <div id="returnPanel" class="d-none mt-3 border-top pt-3">
+        <form method="POST">
+            <input type="hidden" name="action" value="return">
+            <label class="form-label fw-semibold">Reason / Feedback</label>
+            <textarea name="remarks" class="form-control mb-2" rows="3" required
+                      placeholder="e.g. Please check the Mathematics marks for Asha, they look incorrect before resubmission."></textarea>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-danger"><i class="bi bi-send me-1"></i>Send Feedback</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('returnPanel').classList.add('d-none')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% if history %}
+<div class="card p-3 no-print">
+    <h6 class="mb-3"><i class="bi bi-clock-history me-1"></i>Submission &amp; Feedback History</h6>
+    <ul class="list-unstyled mb-0">
+        {% for h in history %}
+        <li class="mb-2 pb-2 border-bottom">
+            <div class="d-flex justify-content-between">
+                <span class="fw-semibold">
+                    {% if h.action == 'SUBMIT_RESULTS' %}<i class="bi bi-send text-primary me-1"></i>Submitted by {{ h.username }}
+                    {% elif h.action == 'START_REVIEW' %}<i class="bi bi-eye text-info me-1"></i>Review started by {{ h.username }}
+                    {% elif h.action == 'APPROVE_RESULTS' %}<i class="bi bi-check2-circle text-success me-1"></i>Approved by {{ h.username }}
+                    {% elif h.action == 'RETURN_RESULTS' %}<i class="bi bi-arrow-return-left text-danger me-1"></i>Returned by {{ h.username }}
+                    {% endif %}
+                </span>
+                <span class="text-muted small">{{ h.created_at }}</span>
+            </div>
+            {% if h.action == 'RETURN_RESULTS' and ':' in h.details %}
+            <div class="text-muted small mt-1">Feedback: "{{ h.details.split(': ', 1)[1] }}"</div>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

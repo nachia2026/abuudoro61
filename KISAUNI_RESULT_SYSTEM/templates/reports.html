@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block page_title %}Reports{% endblock %}
+{% block content %}
+<h5 class="mb-1">Generate Student Report</h5>
+<p class="text-muted small mb-3">
+    Showing examinations for the current academic year ({{ current_academic_year }}) only.
+    Looking for an older year? All of that data is still safe - open
+    <a href="{{ url_for('records') }}">Exam Records / Search</a> instead.
+</p>
+
+<div class="row g-3">
+    <div class="col-md-7 col-lg-6">
+        <div class="card p-4">
+            <h6><i class="bi bi-person-lines-fill me-1"></i>Student Report</h6>
+            <p class="text-muted small">Official report for a single student, ready to print/give to a parent. Select the Class and Examination first - only students who actually have marks recorded for that examination will appear below.</p>
+            <form method="GET" onsubmit="event.preventDefault();
+                const exam = this.exam_id.value; const stu = this.student_id.value;
+                window.location='/reports/student/' + stu + '/' + exam;">
+                {% if session_user.role == ROLE_CLASS_TEACHER %}
+                    {% if classes %}
+                    <input type="text" class="form-control mb-2" value="{{ classes[0].name }}" disabled>
+                    <input type="hidden" id="rep_class" value="{{ classes[0].id }}">
+                    {% else %}
+                    <div class="alert alert-warning">You are not currently assigned to a class.</div>
+                    {% endif %}
+                {% else %}
+                <select name="class_id" id="rep_class" class="form-select mb-2" required onchange="loadStudents()">
+                    <option value="">-- Class --</option>
+                    {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+                </select>
+                {% endif %}
+                <select name="exam_id" id="rep_exam" class="form-select mb-2" required onchange="loadStudents()">
+                    <option value="">-- Examination --</option>
+                    {% for e in exams %}<option value="{{ e.id }}">{{ e.exam_type }} - {{ e.academic_year }}</option>{% endfor %}
+                </select>
+                <select name="student_id" id="rep_student" class="form-select mb-3" required disabled>
+                    <option value="">-- Select Class and Examination First --</option>
+                </select>
+                <button class="btn btn-success w-100">Generate Student Report</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadStudents() {
+    const classId = document.getElementById('rep_class').value;
+    const examId = document.getElementById('rep_exam').value;
+    const sel = document.getElementById('rep_student');
+
+    if (!classId || !examId) {
+        sel.innerHTML = '<option value="">-- Select Class and Examination First --</option>';
+        sel.disabled = true;
+        return;
+    }
+
+    sel.disabled = false;
+    sel.innerHTML = '<option value="">Loading...</option>';
+    const res = await fetch('/api/students-with-marks/' + classId + '/' + examId);
+    const list = await res.json();
+    if (list.length === 0) {
+        sel.innerHTML = '<option value="">No students have marks for this examination</option>';
+        return;
+    }
+    sel.innerHTML = '<option value="">-- Select Student --</option>';
+    list.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.full_name + ' (' + s.reg_no + ')';
+        sel.appendChild(opt);
+    });
+}
+</script>
+{% endblock %}

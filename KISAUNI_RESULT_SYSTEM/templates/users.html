@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block page_title %}Users / Accounts{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    {{ page_header('bi-person-badge', 'User Management', 'Headmaster and class-teacher accounts') }}
+    <a href="{{ url_for('add_user') }}" class="btn btn-success"><i class="bi bi-person-plus me-1"></i>Add User</a>
+</div>
+<div class="card">
+    <table class="table align-middle mb-0">
+        <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Class</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+        {% for u in users %}
+        <tr>
+            <td class="fw-semibold">
+                <div class="d-flex align-items-center gap-2">
+                    {% set _photo = user_photo_url(u.photo_path) %}
+                    {% if _photo %}
+                    <img src="{{ _photo }}" alt="{{ u.full_name }}" class="user-avatar-img" style="width:32px;height:32px;">
+                    {% else %}
+                    {% set _parts = u.full_name.split() %}
+                    <div class="user-avatar" style="width:32px;height:32px;font-size:.72rem;">{{ (_parts[0][0] ~ (_parts[1][0] if _parts|length > 1 else '')) | upper }}</div>
+                    {% endif %}
+                    <span>{{ u.full_name }}</span>
+                </div>
+            </td>
+            <td>{{ u.username }}</td>
+            <td>
+                {% if u.role == 'headmaster' %}
+                {% if u.title == 'Administrator' %}
+                <span class="badge" style="background:#6f42c1;">Administrator</span>
+                {% else %}
+                <span class="badge bg-dark">Headmaster</span>
+                {% endif %}
+                {% else %}
+                <span class="badge bg-info text-dark">Class Teacher</span>
+                {% endif %}
+            </td>
+            <td>{{ u.class_name or '-' }}</td>
+            <td>
+                {% if u.active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Deactivated</span>{% endif %}
+                {% if u.must_change_password %}<span class="badge bg-warning text-dark">Temp Password</span>{% endif %}
+            </td>
+            <td class="text-end">
+                <a href="{{ url_for('edit_user', user_id=u.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                {% if u.role != 'headmaster' %}
+                <form method="POST" action="{{ url_for('toggle_user', user_id=u.id) }}" class="d-inline">
+                    <button class="btn btn-sm {{ 'btn-outline-danger' if u.active else 'btn-outline-success' }}">
+                        <i class="bi {{ 'bi-slash-circle' if u.active else 'bi-check-circle' }}"></i>
+                    </button>
+                </form>
+                {% if u.id != session_user.id %}
+                <form method="POST" action="{{ url_for('delete_user', user_id=u.id) }}" class="d-inline"
+                      onsubmit="return appConfirm(this, 'Permanently delete the account \'{{ u.username }}\' ({{ u.full_name }})? This cannot be undone - if you just want to reuse this class for another teacher, Deactivate is usually safer.', {okText: 'Delete permanently', icon: 'bi-trash3-fill'});">
+                    <button class="btn btn-sm btn-danger" title="Permanently Delete Account">
+                        <i class="bi bi-trash3-fill"></i>
+                    </button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

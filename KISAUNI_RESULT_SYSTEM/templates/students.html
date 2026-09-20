@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block page_title %}Students{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    {{ page_header('bi-people', 'Removed Students' if show_removed else 'Student List', 'Students who have left or been withdrawn' if show_removed else 'Manage students across all classes') }}
+    <div>
+        {% if session_user.role == ROLE_HEADMASTER %}
+            {% if show_removed %}
+            <a href="{{ url_for('students') }}" class="btn btn-outline-secondary me-2"><i class="bi bi-arrow-left me-1"></i>Back to Active List</a>
+            {% else %}
+            <a href="{{ url_for('students', status='removed') }}" class="btn btn-outline-secondary me-2"><i class="bi bi-archive me-1"></i>View Removed Students</a>
+            {% endif %}
+        {% endif %}
+        {% if not show_removed %}
+        <a href="{{ url_for('add_students_bulk') }}" class="btn btn-outline-success me-2"><i class="bi bi-people-fill me-1"></i>Register Multiple</a>
+        <a href="{{ url_for('add_student') }}" class="btn btn-success"><i class="bi bi-person-plus me-1"></i>Register Student</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if show_removed %}
+<div class="alert alert-info small">
+    Students here were removed (soft-deleted) - their history is hidden from the active list but still
+    intact. From here you can <strong>Restore</strong> a real student who left by mistake, or
+    <strong>Permanently Delete</strong> a student and every mark they have (e.g. leftover test/junk
+    data) - permanent deletion cannot be undone.
+</div>
+{% endif %}
+
+<div class="card p-3 mb-3">
+    <form method="GET" class="row g-2 align-items-end">
+        {% if session_user.role == ROLE_HEADMASTER %}
+        <div class="col-auto">
+            <label class="form-label small mb-1">Class</label>
+            <select name="class_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">All Classes</option>
+                {% for c in classes %}
+                <option value="{{ c.id }}" {% if class_filter|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div class="col-auto">
+            <label class="form-label small mb-1">Search</label>
+            <input type="text" name="q" class="form-control form-control-sm" placeholder="Search by name or Reg No..." value="{{ search }}">
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-search me-1"></i>Search</button>
+        </div>
+    </form>
+</div>
+
+{% if not grouped %}
+<div class="alert alert-info">No students found.</div>
+{% endif %}
+
+{% for class_name, list in grouped.items() %}
+<div class="card mb-3">
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-door-open me-1"></i>{{ class_name }}</span>
+        <span class="d-flex align-items-center gap-2">
+            <span class="badge rounded-pill class-gender-chip class-gender-chip--boys">
+                Boys {{ list|selectattr('gender','equalto','Male')|list|length }}
+            </span>
+            <span class="badge rounded-pill class-gender-chip class-gender-chip--girls">
+                Girls {{ list|selectattr('gender','equalto','Female')|list|length }}
+            </span>
+            <span class="badge bg-secondary">{{ list|length }} students</span>
+        </span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th>#</th><th>Reg No</th><th>Full Name</th><th>Gender</th><th class="text-end no-print">Actions</th></tr></thead>
+            <tbody>
+            {% for s in list %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ s.reg_no }}</td>
+                <td>{{ s.full_name }}</td>
+                <td>
+                    <span class="badge badge-gender-{{ s.gender }}">{{ s.gender }}</span>
+                    {% if not s.gender_confirmed %}<i class="bi bi-exclamation-triangle text-warning ms-1" title="Not confirmed"></i>{% endif %}
+                </td>
+                <td class="text-end no-print">
+                    {% if show_removed %}
+                        <a href="{{ url_for('student_history', student_id=s.id) }}" class="btn btn-sm btn-outline-info" title="History"><i class="bi bi-clock-history"></i></a>
+                        <form method="POST" action="{{ url_for('restore_student', student_id=s.id) }}" class="d-inline"
+                              onsubmit="return appConfirm(this, 'Restore {{ s.full_name }} back to the active student list?', {okClass: 'btn-primary', okText: 'Restore', icon: 'bi-arrow-counterclockwise'});">
+                            <button class="btn btn-sm btn-outline-success" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
+                        </form>
+                        <form method="POST" action="{{ url_for('purge_student', student_id=s.id) }}" class="d-inline"
+                              onsubmit="return appConfirm(this, 'PERMANENTLY delete {{ s.full_name }} and every mark ever recorded for them? This CANNOT be undone.', {okText: 'Delete permanently', icon: 'bi-trash3-fill'});">
+                            <button class="btn btn-sm btn-danger" title="Permanently Delete"><i class="bi bi-trash3-fill"></i></button>
+                        </form>
+                    {% else %}
+                        <a href="{{ url_for('student_history', student_id=s.id) }}" class="btn btn-sm btn-outline-info" title="History"><i class="bi bi-clock-history"></i></a>
+                        <a href="{{ url_for('edit_student', student_id=s.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                        <form method="POST" action="{{ url_for('delete_student', student_id=s.id) }}" class="d-inline"
+                              onsubmit="return appConfirm(this, 'Are you sure you want to remove {{ s.full_name }}?', {okText: 'Remove', icon: 'bi-trash'});">
+                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

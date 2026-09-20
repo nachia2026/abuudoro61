@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block page_title %}Audit Log{% endblock %}
+{% block content %}
+{{ page_header('bi-shield-check', 'Audit Log', 'System activity - records kept for ' ~ retention_days ~ ' days') }}
+{% set action_labels = {
+    'ADD_CLASS': 'Added a class', 'ADD_EXAM': 'Added an examination',
+    'ADD_STUDENT': 'Added a student', 'ADD_STUDENTS_BULK': 'Added students (bulk)',
+    'ADD_SUBJECT': 'Added a subject', 'ADD_USER': 'Added a user account',
+    'ADVANCE_ACADEMIC_YEAR': 'Advanced the academic year', 'APPROVE_RESULTS': 'Approved results',
+    'ASSIGN_CLASS_TEACHER': 'Assigned a class teacher', 'CHANGE_PASSWORD': 'Changed password',
+    'CREATE_BACKUP': 'Created a backup', 'DELETE_BACKUP': 'Deleted a backup',
+    'DELETE_CLASS': 'Removed a class', 'DELETE_EXAM': 'Deleted an examination',
+    'DELETE_STUDENT': 'Removed a student', 'DELETE_SUBJECT': 'Deleted a subject',
+    'DELETE_USER': 'Deleted a user account', 'DOWNLOAD_BACKUP': 'Downloaded a backup',
+    'EDIT_STUDENT': 'Edited a student', 'EDIT_USER': 'Edited a user account',
+    'ENTER_MARKS': 'Entered marks', 'LOGIN': 'Logged in', 'LOGOUT': 'Logged out',
+    'PASSWORD_RESET_REQUESTED': 'Requested a password reset', 'PROMOTE_CLASS': 'Promoted a class',
+    'PROMOTE_GRADUATE': 'Graduated a class', 'PROMOTE_MY_CLASS': 'Promoted own class',
+    'PROMOTE_MY_CLASS_GRADUATE': 'Graduated own class', 'PURGE_STUDENT': 'Permanently deleted a student',
+    'RESTORE_BACKUP': 'Restored a backup', 'RESTORE_BACKUP_UPLOAD': 'Restored from an uploaded backup',
+    'RESTORE_STUDENT': 'Restored a student', 'RETURN_RESULTS': 'Returned results',
+    'START_REVIEW': 'Started results review', 'SUBMIT_RESULTS': 'Submitted results',
+    'TOGGLE_USER': 'Activated/deactivated a user', 'UPDATE_PROFILE': 'Updated profile',
+    'UPDATE_SETTINGS': 'Updated school settings',
+} %}
+<div class="card">
+    <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
+        <tbody>
+        {% for log in logs %}
+        <tr>
+            <td class="text-muted">{{ log.created_at }}</td>
+            <td>{{ log.username }}</td>
+            <td><span class="badge bg-light text-dark border" title="{{ log.action }}">{{ action_labels.get(log.action, log.action) }}</span></td>
+            <td class="text-muted">{{ log.details }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted">No records yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

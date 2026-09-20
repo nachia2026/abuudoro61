@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block page_title %}Marks Entry{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h5 class="mb-0">{{ cls.name }} — {{ exam.exam_type }} ({{ exam.academic_year }})</h5>
+        <span class="badge status-badge-{{ status }} mt-1">Status: {{ STATUS_LABELS.get(status, status)|upper }}</span>
+    </div>
+    <a href="{{ url_for('marks_select') }}" class="btn btn-sm btn-outline-secondary">&larr; Back</a>
+</div>
+
+{% if status == 'returned' %}
+<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i>The Headmaster has returned these results for correction. Make your corrections and resubmit.</div>
+{% endif %}
+
+{% if locked %}
+<div class="alert alert-info"><i class="bi bi-lock me-1"></i>Marks for this class are locked (read-only) because they have already been submitted or approved.</div>
+{% endif %}
+
+<form method="POST">
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle mb-0 marks-table">
+            <colgroup>
+                <col style="width:190px;">
+                {% for sub in subjects %}<col style="width:115px;">{% endfor %}
+                <col style="width:80px;">
+                <col style="width:90px;">
+                <col style="width:80px;">
+                <col style="width:80px;">
+            </colgroup>
+            <thead>
+            <tr>
+                <th>Student Name</th>
+                {% for sub in subjects %}<th class="text-center">{{ sub.name }}</th>{% endfor %}
+                <th class="text-center">Total</th>
+                <th class="text-center">Average</th>
+                <th class="text-center">Grade</th>
+                <th class="text-center">Position</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for r in results %}
+            <tr>
+                <td>{{ r.student.full_name }} <div class="text-muted small">{{ r.student.reg_no }}</div></td>
+                {% for sub in subjects %}
+                <td>
+                    <input type="number" min="0" max="100" step="0.5"
+                           class="form-control form-control-sm text-center score-input"
+                           data-student="{{ r.student.id }}"
+                           name="score_{{ r.student.id }}_{{ sub.id }}"
+                           value="{{ r.scores.get(sub.id, '') }}"
+                           {% if locked %}disabled{% endif %}>
+                </td>
+                {% endfor %}
+                <td class="text-center fw-semibold" id="total-{{ r.student.id }}">{{ r.total if r.subjects_entered else '-' }}</td>
+                <td class="text-center fw-semibold" id="avg-{{ r.student.id }}">{{ r.average if r.average is not none else '-' }}</td>
+                <td class="text-center" id="grade-{{ r.student.id }}">
+                    <span class="grade-badge grade-{{ r.grade }}">{{ r.grade }}</span>
+                </td>
+                <td class="text-center fw-semibold">{{ r.position if r.average is not none else '-' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ subjects|length + 5 }}" class="text-center text-muted">No students in this class.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if not locked %}
+<div class="mt-3 d-flex gap-2 no-print">
+    <button type="submit" class="btn btn-success"><i class="bi bi-save me-1"></i>Save Marks</button>
+</div>
+{% endif %}
+</form>
+
+{% if not locked and results %}
+{% set missing_ns = namespace(total=0) %}
+{% for r in results %}{% set missing_ns.total = missing_ns.total + (subjects|length - r.subjects_entered) %}{% endfor %}
+<div class="mt-2 no-print">
+    {% if missing_ns.total == 0 %}
+    <div class="alert alert-success py-2 mb-2"><i class="bi bi-check-circle me-1"></i>All marks completed - ready to submit.</div>
+    {% else %}
+    <div class="alert alert-warning py-2 mb-2">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        {{ missing_ns.total }} mark(s) still missing. You can submit only once every student has every subject filled in.
+    </div>
+    {% endif %}
+</div>
+<form method="POST" action="{{ url_for('submit_marks', exam_id=exam.id, class_id=cls.id) }}" class="mt-2 no-print"
+      onsubmit="return appConfirm(this, 'Are you sure you want to submit these results to the Headmaster? Once submitted, you will not be able to edit them until they are returned.', {okClass: 'btn-success', okText: 'Submit', icon: 'bi-send-check'});">
+    <button class="btn btn-outline-primary" {% if missing_ns.total > 0 %}disabled title="Fill in every mark first"{% endif %}>
+        <i class="bi bi-send me-1"></i>Submit for Headmaster Review
+    </button>
+</form>
+{% endif %}
+
+{% if history %}
+<div class="card p-3 mt-3 no-print">
+    <h6 class="mb-3"><i class="bi bi-clock-history me-1"></i>Submission &amp; Feedback History</h6>
+    <ul class="list-unstyled mb-0">
+        {% for h in history %}
+        <li class="mb-2 pb-2 border-bottom">
+            <div class="d-flex justify-content-between">
+                <span class="fw-semibold">
+                    {% if h.action == 'SUBMIT_RESULTS' %}<i class="bi bi-send text-primary me-1"></i>Submitted by {{ h.username }}
+                    {% elif h.action == 'START_REVIEW' %}<i class="bi bi-eye text-info me-1"></i>Review started by {{ h.username }}
+                    {% elif h.action == 'APPROVE_RESULTS' %}<i class="bi bi-check2-circle text-success me-1"></i>Approved by {{ h.username }}
+                    {% elif h.action == 'RETURN_RESULTS' %}<i class="bi bi-arrow-return-left text-danger me-1"></i>Returned by {{ h.username }}
+                    {% endif %}
+                </span>
+                <span class="text-muted small">{{ h.created_at }}</span>
+            </div>
+            {% if h.action == 'RETURN_RESULTS' and ':' in h.details %}
+            <div class="text-muted small mt-1">Feedback: "{{ h.details.split(': ', 1)[1] }}"</div>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% endblock %}

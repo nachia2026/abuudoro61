@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block page_title %}Performance Analytics{% endblock %}
+{% block content %}
+
+{% if view_scope == 'school' %}
+    {{ page_header('bi-graph-up-arrow', 'Performance Analytics', 'School-wide subject and grade performance across all classes') }}
+{% elif cls %}
+    {{ page_header('bi-graph-up-arrow', 'Performance Analytics', cls.name ~ ' - subject and grade performance') }}
+{% else %}
+    {{ page_header('bi-graph-up-arrow', 'Performance Analytics', 'Track class and subject performance across exams') }}
+{% endif %}
+
+<form method="GET" class="mb-3 d-flex flex-wrap gap-2">
+    <select name="exam_id" class="form-select form-select-sm" style="max-width:260px;" onchange="this.form.submit()">
+        {% for e in exams %}
+        <option value="{{ e.id }}" {% if e.id == exam_id %}selected{% endif %}>{{ e.exam_type }} - {{ e.academic_year }}</option>
+        {% endfor %}
+    </select>
+
+    {% if session_user.role == ROLE_HEADMASTER %}
+    <select name="class_id" class="form-select form-select-sm" style="max-width:220px;" onchange="this.form.submit()">
+        <option value="all" {% if not class_id %}selected{% endif %}>All Classes (School-wide)</option>
+        {% for c in classes %}
+        <option value="{{ c.id }}" {% if c.id == class_id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+    </select>
+    {% endif %}
+</form>
+
+{% if not analytics or not analytics.student_count %}
+<p class="text-muted">No marks recorded yet for this selection.</p>
+
+{% else %}
+{# ---------- 1) Overall average + grade ---------- #}
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card p-3 h-100 text-center">
+            <span class="stat-label-chip stat-label-chip--blue">
+                {% if view_scope == 'school' %}SCHOOL AVERAGE{% else %}CLASS AVERAGE{% endif %}
+            </span>
+            <div style="font-size:2rem; font-weight:700;">{{ analytics.class_average if analytics.class_average is not none else '-' }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3 h-100 text-center">
+            <span class="stat-label-chip stat-label-chip--green">AVERAGE GRADE</span>
+            <div><span class="grade-chip grade-chip-{{ analytics.class_grade }}" style="font-size:1rem;">{{ analytics.class_grade }}</span></div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3 h-100 text-center">
+            <span class="stat-label-chip stat-label-chip--amber">STUDENTS WITH MARKS</span>
+            <div style="font-size:2rem; font-weight:700;">{{ analytics.student_count }}</div>
+        </div>
+    </div>
+    {% if view_scope == 'school' %}
+    <div class="col-md-6">
+        <div class="card p-3 h-100 text-center">
+            <span class="stat-label-chip" style="background:#dcfce7; color:#16a34a;">HIGHEST AVERAGE</span>
+            <div style="font-size:1.6rem; font-weight:700;">{{ analytics.highest_average if analytics.highest_average is not none else '-' }}</div>
+            {% if analytics.highest_average_class %}<div class="text-muted" style="font-size:.85rem;">{{ analytics.highest_average_class }}</div>{% endif %}
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3 h-100 text-center">
+            <span class="stat-label-chip" style="background:#fee2e2; color:#dc2626;">LOWEST AVERAGE</span>
+            <div style="font-size:1.6rem; font-weight:700;">{{ analytics.lowest_average if analytics.lowest_average is not none else '-' }}</div>
+            {% if analytics.lowest_average_class %}<div class="text-muted" style="font-size:.85rem;">{{ analytics.lowest_average_class }}</div>{% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{# ---------- 1b) Trend: class/school average across recent exams ---------- #}
+{% if trend and trend|length > 1 %}
+<div class="card p-3 mb-3">
+    <span class="stat-label-chip stat-label-chip--blue"><i class="bi bi-graph-up me-1"></i>TREND - LAST {{ trend|length }} EXAMS</span>
+    <div class="position-relative mt-2" style="height:220px;">
+        <canvas id="trendChart"></canvas>
+    </div>
+</div>
+{% endif %}
+
+{# ---------- 2) Top 3 / Bottom 3 subjects ---------- #}
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card p-3 h-100">
+            <span class="stat-label-chip stat-label-chip--amber"><i class="bi bi-trophy me-1"></i>TOP 3 SUBJECTS{% if view_scope == 'school' %} - SCHOOL-WIDE{% endif %}</span>
+            {% if analytics.top_subjects %}
+            <div class="d-flex flex-column gap-2 mt-2">
+                {% for s in analytics.top_subjects %}
+                <div class="border rounded p-2 d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small">#{{ loop.index }}</span>
+                        <span class="fw-semibold ms-1">{{ s.name }}</span>
+                        <div class="text-muted small">{{ s.average }}% average</div>
+                    </div>
+                    <span class="grade-chip grade-chip-{{ s.grade }}">{{ s.grade }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted mb-0 mt-2">Not enough marks recorded yet.</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3 h-100">
+            <span class="stat-label-chip" style="background:#fee2e2; color:#dc2626;"><i class="bi bi-flag me-1"></i>SUBJECTS NEEDING ATTENTION{% if view_scope == 'school' %} - SCHOOL-WIDE{% endif %}</span>
+            {% if analytics.bottom_subjects %}
+            <div class="d-flex flex-column gap-2 mt-2">
+                {% for s in analytics.bottom_subjects %}
+                <div class="border rounded p-2 d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small">#{{ loop.index }}</span>
+                        <span class="fw-semibold ms-1">{{ s.name }}</span>
+                        <div class="text-muted small">{{ s.average }}% average</div>
+                    </div>
+                    <span class="grade-chip grade-chip-{{ s.grade }}">{{ s.grade }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted mb-0 mt-2">Not enough subjects to compare yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ---------- 3) Grade distribution per subject (table) - class view only ---------- #}
+{% if view_scope == 'class' and analytics.subject_stats %}
+<div class="card p-3 mb-3">
+    <span class="stat-label-chip stat-label-chip--purple"><i class="bi bi-table me-1"></i>GRADE DISTRIBUTION BY SUBJECT</span>
+    <div class="table-responsive mt-2">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Subject</th>
+                    {% for g in ['A', 'B', 'C', 'D', 'E'] %}
+                    <th class="text-center">{{ g }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in analytics.subject_stats %}
+                <tr>
+                    <td class="fw-semibold">{{ s.name }}</td>
+                    {% for g in ['A', 'B', 'C', 'D', 'E'] %}
+                    <td class="text-center">{{ s.grade_counts[g] }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{# ---------- 5) Headmaster: class ranking / leaderboard (points 1-4 for every class, ranked best-to-weakest) ---------- #}
+{% if view_scope == 'school' and analytics.per_class %}
+<div class="card p-3 mb-3">
+    <span class="stat-label-chip stat-label-chip--purple"><i class="bi bi-grid-3x3-gap me-1"></i>PER CLASS BREAKDOWN - RANKED</span>
+    <div class="row g-3 mt-1">
+        {% for pc in analytics.per_class %}
+        <div class="col-md-6 col-lg-4">
+            <div class="border rounded p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="d-flex align-items-center gap-2">
+                        <span class="rank-badge {% if pc.position == 1 %}rank-badge--gold{% endif %}">#{{ pc.position }}</span>
+                        <span class="fw-semibold">{{ pc.cls.name }}</span>
+                    </span>
+                    <span class="grade-chip grade-chip-{{ pc.class_grade }}">{{ pc.class_grade }}</span>
+                </div>
+                <table class="table table-sm mb-2">
+                    <tr><td class="text-muted">Average</td><td class="text-end fw-semibold">{{ pc.class_average }}</td></tr>
+                    <tr><td class="text-muted">Students</td><td class="text-end fw-semibold">{{ pc.student_count }}</td></tr>
+                    <tr><td class="text-muted">Top Subject</td>
+                        <td class="text-end fw-semibold">{{ pc.top_subjects[0].name if pc.top_subjects else '-' }}</td></tr>
+                </table>
+                <a href="{{ url_for('performance_analytics', exam_id=exam_id, class_id=pc.cls.id) }}" class="btn btn-sm btn-outline-primary w-100">
+                    View Full Analytics
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if trend and trend|length > 1 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    {% if trend and trend|length > 1 %}
+    const trendCtx = document.getElementById("trendChart");
+    if (trendCtx) {
+        new Chart(trendCtx, {
+            type: "line",
+            data: {
+                labels: {{ trend | map(attribute='label') | list | tojson }},
+                datasets: [{
+                    label: "Average",
+                    data: {{ trend | map(attribute='average') | list | tojson }},
+                    borderColor: "#2563eb",
+                    backgroundColor: "rgba(37,99,235,0.1)",
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { min: 0, max: 100 } }
+            }
+        });
+    }
+    {% endif %}
+});
+</script>
+{% endif %}
+{% endblock %}

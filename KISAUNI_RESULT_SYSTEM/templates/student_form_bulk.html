@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block page_title %}Register Multiple Students{% endblock %}
+{% block content %}
+<div class="card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Register Multiple Students</h5>
+        <a href="{{ url_for('add_student') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-person-plus me-1"></i>Register One Instead
+        </a>
+    </div>
+    <p class="text-muted">Add as many students as you like below, then click <strong>Save All</strong> once at the end.</p>
+
+    <form method="POST" id="bulkForm">
+        <div class="mb-3" style="max-width:320px;">
+            <label class="form-label">Class</label>
+            {% if session_user.role == ROLE_CLASS_TEACHER %}
+                <input type="text" class="form-control" value="{{ classes[0].name if classes else 'No class assigned' }}" disabled>
+                <input type="hidden" name="class_id" value="{{ classes[0].id if classes else '' }}">
+            {% else %}
+                <select class="form-select" name="class_id" required>
+                    <option value="">-- Select Class --</option>
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if selected_class|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            {% endif %}
+        </div>
+
+        <div class="table-responsive">
+            <table class="table align-middle" id="bulkTable">
+                <thead>
+                    <tr>
+                        <th style="width:3%;">#</th>
+                        <th style="width:22%;">Reg No (Admission Number)</th>
+                        <th style="width:45%;">Student's Full Name</th>
+                        <th style="width:20%;">Gender</th>
+                        <th style="width:10%;"></th>
+                    </tr>
+                </thead>
+                <tbody id="bulkTableBody">
+                    {% for r in rows %}
+                    <tr>
+                        <td class="row-num"></td>
+                        <td><input type="text" class="form-control" name="reg_no[]" value="{{ r.reg_no }}"></td>
+                        <td><input type="text" class="form-control bulk-name" name="full_name[]" value="{{ r.full_name }}"></td>
+                        <td>
+                            <select class="form-select bulk-gender" name="gender[]">
+                                <option value="">-- Select --</option>
+                                <option value="Male" {% if r.gender=='Male' %}selected{% endif %}>Male</option>
+                                <option value="Female" {% if r.gender=='Female' %}selected{% endif %}>Female</option>
+                            </select>
+                        </td>
+                        <td><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="bi bi-trash"></i></button></td>
+                    </tr>
+                    {% endfor %}
+                    {% if not rows %}
+                    {% for i in range(3) %}
+                    <tr>
+                        <td class="row-num"></td>
+                        <td><input type="text" class="form-control" name="reg_no[]"></td>
+                        <td><input type="text" class="form-control bulk-name" name="full_name[]"></td>
+                        <td>
+                            <select class="form-select bulk-gender" name="gender[]">
+                                <option value="">-- Select --</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </td>
+                        <td><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="bi bi-trash"></i></button></td>
+                    </tr>
+                    {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <button type="button" id="addRowBtn" class="btn btn-outline-primary btn-sm mb-4">
+            <i class="bi bi-plus-lg me-1"></i>Add Another Row
+        </button>
+
+        <div>
+            <button type="submit" class="btn btn-success px-4"><i class="bi bi-save me-1"></i>Save All</button>
+            <a href="{{ url_for('students') }}" class="btn btn-outline-secondary px-4">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const tbody = document.getElementById("bulkTableBody");
+    const addRowBtn = document.getElementById("addRowBtn");
+
+    function renumberRows() {
+        tbody.querySelectorAll("tr").forEach((tr, i) => {
+            tr.querySelector(".row-num").textContent = i + 1;
+        });
+    }
+
+    function attachRowEvents(tr) {
+        const removeBtn = tr.querySelector(".remove-row");
+        removeBtn.addEventListener("click", function () {
+            if (tbody.querySelectorAll("tr").length > 1) {
+                tr.remove();
+                renumberRows();
+            } else {
+                // keep at least one row - just clear it instead
+                tr.querySelectorAll("input").forEach(i => i.value = "");
+                tr.querySelectorAll("select").forEach(s => s.value = "");
+            }
+        });
+
+        const nameInput = tr.querySelector(".bulk-name");
+        const genderSelect = tr.querySelector(".bulk-gender");
+        let debounceTimer;
+        nameInput.addEventListener("input", function () {
+            clearTimeout(debounceTimer);
+            const name = nameInput.value.trim();
+            debounceTimer = setTimeout(async () => {
+                if (!name || genderSelect.value) return; // don't override a manual choice
+                try {
+                    const res = await fetch(`/api/detect-gender?name=${encodeURIComponent(name)}`);
+                    const data = await res.json();
+                    if (data.gender) genderSelect.value = data.gender;
+                } catch (e) {
+                    console.error("Gender detect failed", e);
+                }
+            }, 450);
+        });
+    }
+
+    function addRow() {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td class="row-num"></td>
+            <td><input type="text" class="form-control" name="reg_no[]"></td>
+            <td><input type="text" class="form-control bulk-name" name="full_name[]"></td>
+            <td>
+                <select class="form-select bulk-gender" name="gender[]">
+                    <option value="">-- Select --</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                </select>
+            </td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="bi bi-trash"></i></button></td>
+        `;
+        tbody.appendChild(tr);
+        attachRowEvents(tr);
+        renumberRows();
+        tr.querySelector("input[name='reg_no[]']").focus();
+    }
+
+    tbody.querySelectorAll("tr").forEach(attachRowEvents);
+    renumberRows();
+    addRowBtn.addEventListener("click", addRow);
+})();
+</script>
+{% endblock %}

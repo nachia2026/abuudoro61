@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block page_title %}{{ 'Register Student' if mode=='add' else 'Edit Student' }}{% endblock %}
+{% block content %}
+<div class="card p-4" style="max-width:600px;">
+    <h5 class="mb-3">{{ 'Register New Student' if mode=='add' else 'Edit Student Details' }}</h5>
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">Reg No (Admission Number)</label>
+            <input type="text" class="form-control" name="reg_no" required
+                   value="{{ student['reg_no'] if student else '' }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Student's Full Name</label>
+            <input type="text" id="full_name" class="form-control" name="full_name" required autocomplete="off"
+                   value="{{ student['full_name'] if student else '' }}">
+        </div>
+        <div class="row">
+            <div class="col-7 mb-3">
+                <label class="form-label">Gender</label>
+                <select id="gender" class="form-select" name="gender">
+                    <option value="">-- Select --</option>
+                    <option value="Male" {% if student and student['gender']=='Male' %}selected{% endif %}>Male</option>
+                    <option value="Female" {% if student and student['gender']=='Female' %}selected{% endif %}>Female</option>
+                </select>
+                <div id="gender-hint" class="form-text"></div>
+            </div>
+            <div class="col-5 mb-3 d-flex align-items-center">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" id="gender_confirmed" name="gender_confirmed"
+                           {% if student and student['gender_confirmed'] %}checked{% endif %}>
+                    <label class="form-check-label" for="gender_confirmed">Confirm Gender</label>
+                </div>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Class</label>
+            {% if session_user.role == ROLE_CLASS_TEACHER %}
+                <input type="text" class="form-control" value="{{ classes[0].name if classes else 'No class assigned' }}" disabled>
+                <input type="hidden" name="class_id" value="{{ classes[0].id if classes else '' }}">
+                <div class="form-text">You can only register/edit students in your own assigned class.</div>
+            {% else %}
+                <select class="form-select" name="class_id" required>
+                    <option value="">-- Select Class --</option>
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if student and student['class_id']|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            {% endif %}
+        </div>
+        <button class="btn btn-success"><i class="bi bi-check2 me-1"></i>{{ 'Register Student' if mode=='add' else 'Save Changes' }}</button>
+        <a href="{{ url_for('students') }}" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

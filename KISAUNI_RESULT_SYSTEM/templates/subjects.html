@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block page_title %}Subjects{% endblock %}
+{% block content %}
+{{ page_header('bi-book', 'Subject Management', 'Add, edit or remove subjects taught in each class') }}
+
+{% if session_user.role == ROLE_HEADMASTER %}
+<div class="card p-3 mb-3">
+    <form method="POST" class="row g-2 align-items-end">
+        <input type="hidden" name="action" value="add_subject">
+        <div class="col-md-3">
+            <label class="form-label small">New Subject Name</label>
+            <input type="text" name="name" class="form-control form-control-sm" required>
+        </div>
+        <div class="col-md-7">
+            <label class="form-label small">Which Classes Teach This Subject?</label>
+            <div class="d-flex flex-wrap gap-2">
+                {% for c in classes %}
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" name="class_ids" value="{{ c.id }}" id="nc{{ c.id }}">
+                    <label class="form-check-label small" for="nc{{ c.id }}">{{ c.name }}</label>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-success btn-sm w-100">Add Subject</button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+            <tr>
+                <th>Subject</th>
+                {% for c in classes %}<th class="text-center">{{ c.name.replace('Standard ', 'Std ') }}</th>{% endfor %}
+                {% if session_user.role == ROLE_HEADMASTER %}<th class="text-center">Delete</th>{% endif %}
+            </tr>
+            </thead>
+            <tbody>
+            {% for s in all_subjects %}
+            <tr>
+                <td class="fw-semibold">{{ s.name }}</td>
+                {% for c in classes %}
+                <td class="text-center">
+                    {% if session_user.role == ROLE_HEADMASTER %}
+                    <form method="POST" class="d-inline-block">
+                        <input type="hidden" name="action" value="toggle">
+                        <input type="hidden" name="class_id" value="{{ c.id }}">
+                        <input type="hidden" name="subject_id" value="{{ s.id }}">
+                        <button class="subject-toggle {{ 'checked' if (c.id, s.id) in mapping_set else '' }}" title="{{ 'Assigned - click to remove' if (c.id, s.id) in mapping_set else 'Not assigned - click to add' }}">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                    </form>
+                    {% else %}
+                        {% if (c.id, s.id) in mapping_set %}<i class="bi bi-check-lg text-success"></i>{% endif %}
+                    {% endif %}
+                </td>
+                {% endfor %}
+                {% if session_user.role == ROLE_HEADMASTER %}
+                <td class="text-center">
+                    <form method="POST" action="{{ url_for('delete_subject', subject_id=s.id) }}"
+                          onsubmit="return appConfirm(this, 'Delete subject \'{{ s.name }}\' completely from the system? This cannot be undone.', {okText: 'Delete', icon: 'bi-trash'});">
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<p class="text-muted small mt-2">Bofya tick-box kuongeza au kuondoa somo kwa darasa husika. Tumia icon ya trash kufuta somo kabisa (inawezekana tu kama hakuna alama zilizowekwa bado kwa somo hilo).</p>
+{% endblock %}

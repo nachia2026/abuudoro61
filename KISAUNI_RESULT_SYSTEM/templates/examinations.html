@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block page_title %}Examinations{% endblock %}
+{% block content %}
+{{ page_header('bi-calendar2-week', 'Examination Management', 'Showing examinations for Academic Year ' ~ current_academic_year ~ ' only') }}
+<p class="text-muted small">
+    Set the academic year in <a href="{{ url_for('settings_page') }}">Settings</a>. Examinations from previous
+    years remain safely stored with all their marks and results, they are just not listed here.
+</p>
+
+{% if session_user.role == ROLE_HEADMASTER %}
+<div class="card p-3 mb-3">
+    <form method="POST" class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small">Examination Type</label>
+            <select name="exam_type" class="form-select form-select-sm" required>
+                {% for t in exam_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small">Academic Year</label>
+            <input type="text" class="form-control form-control-sm" value="{{ current_academic_year }}" disabled>
+            <div class="form-text">Set from <a href="{{ url_for('settings_page') }}">Settings</a> - applies everywhere automatically.</div>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-success btn-sm w-100">Add Examination</button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<div class="card">
+    <table class="table align-middle mb-0">
+        <thead><tr><th>#</th><th>Examination Type</th><th>Academic Year</th>{% if session_user.role == ROLE_HEADMASTER %}<th class="text-end">Action</th>{% endif %}</tr></thead>
+        <tbody>
+        {% for e in exams %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td class="fw-semibold">{{ e.exam_type }}</td>
+            <td>{{ e.academic_year }}</td>
+            {% if session_user.role == ROLE_HEADMASTER %}
+            <td class="text-end">
+                <form method="POST" action="{{ url_for('delete_examination', exam_id=e.id) }}"
+                      onsubmit="return appConfirm(this, 'Delete {{ e.exam_type }} ({{ e.academic_year }})? This only works if no marks/results exist for it yet.', {okText: 'Delete', icon: 'bi-trash'});">
+                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Remove</button>
+                </form>
+            </td>
+            {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted">No examinations yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

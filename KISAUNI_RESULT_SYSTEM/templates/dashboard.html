@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+
+<div class="dash-hero">
+    <div>
+        <h4 class="mb-1">Welcome back, {{ session_user.full_name }} 👋</h4>
+        <div class="dash-hero-date" id="heroDate">{{ school_name }} &middot; Academic Year {{ academic_year }}</div>
+    </div>
+    {% if stats.pending > 0 %}
+    <div class="dash-hero-pending">
+        <div class="n">{{ stats.pending }}</div>
+        <div class="l">Pending Review</div>
+    </div>
+    {% endif %}
+</div>
+
+{% if session_user.role == ROLE_HEADMASTER %}
+    {% if offsite_days is none %}
+    <div class="alert alert-warning">
+        <i class="bi bi-cloud-arrow-down me-1"></i>
+        <strong>You have never downloaded a backup off this server.</strong>
+        If PythonAnywhere ever has a problem with your account, both the live data and every
+        automatic backup live in the same place and could be affected together.
+        <a href="{{ url_for('settings_page') }}#backups" class="alert-link">Download one now &rarr;</a>
+    </div>
+    {% elif offsite_days >= 30 %}
+    <div class="alert alert-warning">
+        <i class="bi bi-cloud-arrow-down me-1"></i>
+        It has been <strong>{{ offsite_days }} days</strong> since you last downloaded a backup off this
+        server. <a href="{{ url_for('settings_page') }}#backups" class="alert-link">Download a fresh one &rarr;</a>
+    </div>
+    {% endif %}
+{% endif %}
+
+{% if my_class %}
+<div class="alert alert-success">
+    <i class="bi bi-door-open me-1"></i>
+    You are assigned to <strong>{{ my_class.name }}</strong> — {{ my_class_students }} students.
+    <a href="{{ url_for('marks_select') }}" class="alert-link">Enter marks &rarr;</a>
+</div>
+{% endif %}
+
+{% for rr in returned_results %}
+<div class="alert alert-danger">
+    <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-bell-fill mt-1"></i>
+        <div class="flex-grow-1">
+            <strong>Your {{ my_class.name }} results ({{ rr.exam_type }} - {{ rr.academic_year }}) were returned for correction by the Headmaster.</strong>
+            {% if rr.remarks %}
+            <div class="mt-1"><em>Feedback:</em> "{{ rr.remarks }}"</div>
+            {% endif %}
+            <div class="mt-2">
+                <a href="{{ url_for('marks', exam_id=rr.exam_id_val, class_id=my_class.id) }}" class="btn btn-sm btn-danger">
+                    <i class="bi bi-arrow-repeat me-1"></i>Review &amp; Correct
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% if my_class_analytics and my_class_latest_exam %}
+<div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0"><i class="bi bi-graph-up-arrow me-1"></i>{{ my_class.name }} Performance - {{ my_class_latest_exam.exam_type }} ({{ my_class_latest_exam.academic_year }})</h6>
+        <a href="{{ url_for('performance_analytics', exam_id=my_class_latest_exam.id) }}" class="btn btn-sm btn-outline-primary">View Full Analytics</a>
+    </div>
+    <div class="row g-3">
+        <div class="col-6 col-md-3">
+            <span class="stat-label-chip stat-label-chip--blue">CLASS AVERAGE</span>
+            <div style="font-size:1.4rem; font-weight:700;">{{ my_class_analytics.class_average if my_class_analytics.class_average is not none else '-' }}</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <span class="stat-label-chip stat-label-chip--green">AVERAGE GRADE</span>
+            <div><span class="grade-chip grade-chip-{{ my_class_analytics.class_grade }}">{{ my_class_analytics.class_grade }}</span></div>
+        </div>
+        <div class="col-12 col-md-6">
+            <span class="stat-label-chip stat-label-chip--amber">TOP SUBJECT{{ 'S' if my_class_analytics.top_subjects|length > 1 else '' }}</span>
+            <div>
+            {% for s in my_class_analytics.top_subjects %}
+            <span class="badge bg-light text-dark border me-1">{{ s.name }} ({{ s.average }}%)</span>
+            {% else %}
+            <span class="text-muted">-</span>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if class_ranking %}
+<div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="stat-label-chip stat-label-chip--purple"><i class="bi bi-bar-chart-steps me-1"></i>CLASS RANKING - {{ my_class_latest_exam.exam_type }} ({{ my_class_latest_exam.academic_year }})</span>
+        <a href="{{ url_for('performance_analytics', exam_id=my_class_latest_exam.id) }}" class="btn btn-sm btn-outline-primary">View My Class Analytics</a>
+    </div>
+
+    {% if leading_class and my_class_rank and leading_class.cls.id != my_class.id %}
+    <p class="text-muted small mb-2">
+        <i class="bi bi-trophy me-1"></i><strong>{{ leading_class.cls.name }}</strong> is currently leading (average {{ leading_class.class_average }}).
+        Your class, <strong>{{ my_class.name }}</strong>, is position <strong>#{{ my_class_rank.position }}</strong> of {{ class_ranking_total }}.
+    </p>
+    {% elif leading_class and leading_class.cls.id == my_class.id %}
+    <p class="text-muted small mb-2">
+        <i class="bi bi-trophy me-1"></i><strong>{{ my_class.name }}</strong> is currently leading the school (position #1 of {{ class_ranking_total }}) 🎉
+    </p>
+    {% endif %}
+
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th class="text-end">Average</th>
+                    <th class="text-center">Grade</th>
+                    <th>Top Subject</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in class_ranking %}
+                <tr {% if e.cls.id == my_class.id %}class="table-active fw-semibold"{% endif %}>
+                    <td><span class="rank-badge {% if e.position == 1 %}rank-badge--gold{% endif %}">#{{ e.position }}</span></td>
+                    <td>{{ e.cls.name }}{% if e.cls.id == my_class.id %} <span class="badge bg-primary ms-1">Your Class</span>{% endif %}</td>
+                    <td class="text-end">{{ e.class_average }}</td>
+                    <td class="text-center"><span class="grade-chip grade-chip-{{ e.class_grade }}">{{ e.class_grade }}</span></td>
+                    <td>{{ e.top_subjects[0].name if e.top_subjects else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- ---------- Top stats: the 6 headline numbers, all live counts ---------- -->
+<div class="row g-3 mb-4 dashboard-stats">
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card stat-card stat-card--blue p-3">
+            <div class="stat-icon stat-icon-blue mb-2"><i class="bi bi-people"></i></div>
+            <div class="stat-value">{{ stats.students }}</div>
+            <div class="text-muted small">Students</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card stat-card stat-card--green p-3">
+            <div class="stat-icon stat-icon-green mb-2"><i class="bi bi-mortarboard"></i></div>
+            <div class="stat-value">{{ stats.teachers }}</div>
+            <div class="text-muted small">Teachers</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card stat-card stat-card--navy p-3">
+            <div class="stat-icon stat-icon-navy mb-2"><i class="bi bi-door-open"></i></div>
+            <div class="stat-value">{{ stats.classes }}</div>
+            <div class="text-muted small">Classes</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card stat-card stat-card--cyan p-3">
+            <div class="stat-icon stat-icon-cyan mb-2"><i class="bi bi-pencil-square"></i></div>
+            <div class="stat-value">{{ stats.exams }}</div>
+            <div class="text-muted small">Examinations</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card stat-card stat-card--orange p-3">
+            <div class="stat-icon stat-icon-orange mb-2"><i class="bi bi-hourglass-split"></i></div>
+            <div class="stat-value">{{ stats.pending }}</div>
+            <div class="text-muted small">Pending Review</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card stat-card stat-card--green p-3">
+            <div class="stat-icon stat-icon-green mb-2"><i class="bi bi-check2-circle"></i></div>
+            <div class="stat-value">{{ stats.approved }}</div>
+            <div class="text-muted small">Approved</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- ---------- Recent Activities: real audit log, restyled ---------- -->
+    {% if session_user.role == ROLE_HEADMASTER %}
+    <div class="col-lg-7">
+        <div class="card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0"><i class="bi bi-clock-history me-1"></i>Recent Activities</h6>
+                <a href="{{ url_for('audit_logs') }}" class="small">View all &rarr;</a>
+            </div>
+            <div class="activity-list">
+            {% for log in recent_logs %}
+                {% set a = log.action %}
+                {% if 'DELETE' in a or 'PURGE' in a %}
+                    {% set icon, iconcls = 'bi-trash3', 'icon-red' %}
+                {% elif 'RESTORE' in a or 'APPROVE' in a or 'PROMOTE' in a %}
+                    {% set icon, iconcls = 'bi-check2-circle', 'icon-green' %}
+                {% elif 'RETURN' in a or 'SUBMIT' in a or 'REVIEW' in a %}
+                    {% set icon, iconcls = 'bi-send-check', 'icon-orange' %}
+                {% elif 'MARKS' in a %}
+                    {% set icon, iconcls = 'bi-input-cursor-text', 'icon-blue' %}
+                {% elif 'STUDENT' in a %}
+                    {% set icon, iconcls = 'bi-people', 'icon-blue' %}
+                {% elif 'EXAM' in a %}
+                    {% set icon, iconcls = 'bi-pencil-square', 'icon-cyan' %}
+                {% elif 'USER' in a %}
+                    {% set icon, iconcls = 'bi-person-badge', 'icon-purple' %}
+                {% elif 'CLASS' in a %}
+                    {% set icon, iconcls = 'bi-door-open', 'icon-navy' %}
+                {% elif 'SUBJECT' in a %}
+                    {% set icon, iconcls = 'bi-journal-bookmark', 'icon-purple' %}
+                {% elif 'BACKUP' in a %}
+                    {% set icon, iconcls = 'bi-cloud-arrow-down', 'icon-navy' %}
+                {% elif 'SETTINGS' in a %}
+                    {% set icon, iconcls = 'bi-gear', 'icon-navy' %}
+                {% else %}
+                    {% set icon, iconcls = 'bi-info-circle', 'icon-blue' %}
+                {% endif %}
+                <div class="activity-row">
+                    <div class="activity-icon {{ iconcls }}"><i class="bi {{ icon }}"></i></div>
+                    <div class="flex-grow-1" style="min-width:0;">
+                        <div class="fw-semibold" style="font-size:.86rem;">{{ log.action.replace('_',' ').title() }}</div>
+                        <div class="text-muted small text-truncate">{{ log.username }}{% if log.details %} &middot; {{ log.details }}{% endif %}</div>
+                    </div>
+                    <div class="text-muted small text-nowrap ms-2">{{ log.created_at }}</div>
+                </div>
+            {% else %}
+                <div class="empty-state py-4">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;"><path d="M4 13v6a1 1 0 001 1h14a1 1 0 001-1v-6M4 13l2.5-7A1 1 0 017.4 5h9.2a1 1 0 01.9 1l2.5 7M4 13h5a1 1 0 011 1 2 2 0 002 2 2 2 0 002-2 1 1 0 011-1h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <div class="msg">No activity yet.</div>
+                </div>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row g-3">
+    <!-- ---------- Students by Class: real per-class counts ---------- -->
+    <div class="col-lg-5">
+        <div class="card p-3 h-100">
+            <h6 class="mb-3"><i class="bi bi-pie-chart me-1"></i>Students by Class</h6>
+            {% if stats.students == 0 %}
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 13v6a1 1 0 001 1h14a1 1 0 001-1v-6M4 13l2.5-7A1 1 0 017.4 5h9.2a1 1 0 01.9 1l2.5 7M4 13h5a1 1 0 011 1 2 2 0 002 2 2 2 0 002-2 1 1 0 011-1h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="msg">No active students yet.</div>
+            </div>
+            {% else %}
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div style="width:180px;height:180px;flex-shrink:0;"><canvas id="classChart"></canvas></div>
+                <div class="flex-grow-1">
+                {% for row in class_breakdown %}
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span><span class="legend-dot" style="background:{{ chart_colors[loop.index0 % chart_colors|length] }};"></span>{{ row.name }}</span>
+                        <span class="text-muted small">{{ row.c }}</span>
+                    </div>
+                {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ---------- Quick Actions: real navigation shortcuts only ---------- -->
+    <div class="col-lg-7">
+        <div class="card p-3 h-100">
+            <h6 class="mb-3"><i class="bi bi-lightning-charge me-1"></i>Quick Actions</h6>
+            <div class="quick-action-grid">
+                <a class="quick-action-tile" href="{{ url_for('add_student') }}">
+                    <div class="qa-icon stat-icon-blue"><i class="bi bi-person-plus"></i></div>Add Student
+                </a>
+                <a class="quick-action-tile" href="{{ url_for('marks_select') }}">
+                    <div class="qa-icon stat-icon-cyan"><i class="bi bi-input-cursor-text"></i></div>Marks Entry
+                </a>
+                <a class="quick-action-tile" href="{{ url_for('reports') }}">
+                    <div class="qa-icon stat-icon-purple"><i class="bi bi-file-earmark-text"></i></div>Reports
+                </a>
+                {% if session_user.role == ROLE_HEADMASTER %}
+                <a class="quick-action-tile" href="{{ url_for('classes') }}">
+                    <div class="qa-icon stat-icon-navy"><i class="bi bi-door-open"></i></div>Add Class
+                </a>
+                <a class="quick-action-tile" href="{{ url_for('add_user') }}">
+                    <div class="qa-icon stat-icon-green"><i class="bi bi-person-badge"></i></div>Add User
+                </a>
+                <a class="quick-action-tile" href="{{ url_for('examinations') }}">
+                    <div class="qa-icon stat-icon-orange"><i class="bi bi-pencil-square"></i></div>Add Exam
+                </a>
+                <a class="quick-action-tile" href="{{ url_for('results') }}">
+                    <div class="qa-icon stat-icon-blue"><i class="bi bi-check2-square"></i></div>Review &amp; Approval
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const dateEl = document.getElementById("heroDate");
+    if (dateEl) {
+        const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+        dateEl.textContent = today;
+    }
+});
+</script>
+{% if class_breakdown and stats.students > 0 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const palette = {{ chart_colors | tojson }};
+    const classCtx = document.getElementById("classChart");
+    if (classCtx) {
+        new Chart(classCtx, {
+            type: "doughnut",
+            data: {
+                labels: {{ class_breakdown | map(attribute='name') | list | tojson }},
+                datasets: [{
+                    data: {{ class_breakdown | map(attribute='c') | list | tojson }},
+                    backgroundColor: palette,
+                    borderWidth: 2,
+                    borderColor: "#fff"
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: "68%",
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

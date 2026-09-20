@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block page_title %}Student Report{% endblock %}
+{% block content %}
+<div class="mb-3 no-print d-flex gap-2">
+    <a href="{{ url_for('reports') }}" class="btn btn-sm btn-outline-secondary">&larr; Back</a>
+    <a href="{{ url_for('student_report_download', student_id=student.id, exam_id=exam.id) }}" class="btn btn-sm btn-success">
+        <i class="bi bi-download me-1"></i>Download PDF
+    </a>
+</div>
+
+<div class="kps-sheet">
+
+    <div class="kps-header-top">
+        <div class="logo-col">
+            <img src="{{ logo_url(logo_path) }}" alt="logo">
+        </div>
+        <div class="center-col">
+            <h1>{{ school_name|upper }}</h1>
+            <div class="subtitle">RESULT REPORT</div>
+            <span class="academic-badge">ACADEMIC YEAR: {{ exam.academic_year }}</span>
+        </div>
+    </div>
+
+    <div class="kps-info-wrap">
+        <div class="kps-info-box">
+            <div class="kps-info-row"><span class="k">Adm No</span><span class="sep">:</span><span class="v">{{ student.reg_no }}</span></div>
+            <div class="kps-info-row"><span class="k">Name</span><span class="sep">:</span><span class="v">{{ student.full_name }}</span></div>
+            <div class="kps-info-row"><span class="k">Class</span><span class="sep">:</span><span class="v">{{ cls.name }}</span></div>
+            <div class="kps-info-row"><span class="k">Gender</span><span class="sep">:</span><span class="v">{{ student.gender }}</span></div>
+            <div class="kps-info-row"><span class="k">Exam</span><span class="sep">:</span><span class="v">{{ exam.exam_type|title }}</span></div>
+        </div>
+    </div>
+
+    <table class="kps-table">
+        <thead>
+        <tr>
+            <th style="width:40px;" class="center">S/N</th>
+            <th>Subject</th>
+            <th class="center" style="width:110px;">Mark (/100)</th>
+            <th class="center" style="width:90px;">Grade</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for sub in subjects %}
+        {% set score = result.scores.get(sub.id) if result else none %}
+        <tr>
+            <td class="center">{{ loop.index }}</td>
+            <td>{{ sub.name|upper }}</td>
+            <td class="center">{{ score if score is not none else '-' }}</td>
+            <td class="center fw-bold">
+                {% if score is not none %}
+                    {% if score >= 81 %}{% set letter = 'A' %}
+                    {% elif score >= 61 %}{% set letter = 'B' %}
+                    {% elif score >= 41 %}{% set letter = 'C' %}
+                    {% elif score >= 21 %}{% set letter = 'D' %}
+                    {% else %}{% set letter = 'E' %}
+                    {% endif %}
+                    <span class="grade-text-{{ letter }}">{{ letter }}</span>
+                {% else %}-{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="kps-table" style="margin-bottom:14px;">
+        <thead>
+        <tr>
+            <th class="center">Total</th>
+            <th class="center">Average</th>
+            <th class="center">Overall Grade</th>
+            <th class="center">Position</th>
+            <th class="center">Remark</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr style="font-weight:700; font-size:1rem;">
+            <td class="center">{{ result.total if result and result.subjects_entered else '-' }}</td>
+            <td class="center">{{ result.average if result and result.average is not none else '-' }}</td>
+            <td class="center"><span class="grade-text-{{ result.grade if result else '-' }}">{{ result.grade if result else '-' }}</span></td>
+            <td class="center">{{ result.position if result else '-' }} of {{ total_students }}</td>
+            <td class="center">{{ result.remark if result else '-' }}</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="kps-remarks">
+        <div class="k">Teacher's Comment:</div>
+        <div class="box">&nbsp;</div>
+    </div>
+
+    <div class="kps-footer">
+        <div class="sign-col">
+            <div class="sign-line">CLASS TEACHER SIGN.{% if teacher %}<br><small>{{ teacher.full_name }}</small>{% endif %}</div>
+            <div class="sign-date">Date: {{ report_date }}</div>
+        </div>
+        <div class="stamp-col">
+            <div class="stamp-circle">{{ school_name|upper }}<br>OFFICIAL STAMP</div>
+        </div>
+        <div class="sign-col">
+            <div class="sign-line">HEAD MASTER SIGN.</div>
+            <div class="sign-date">Date: {{ report_date }}</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
